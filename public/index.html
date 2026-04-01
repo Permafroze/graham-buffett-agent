@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graham-Buffett Investment Agent</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#0f1117; --surface:#1a1d27; --card:#21263a; --border:#2e3450;
+    --accent:#4f7cff; --accent2:#7c5cfc; --text:#e8eaf0; --muted:#8b90a8;
+    --green:#22c55e; --amber:#f59e0b; --red:#ef4444; --radius:10px;
+  }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; line-height:1.6; min-height:100vh; }
+  .shell { display:grid; grid-template-columns:300px 1fr; min-height:100vh; }
+
+  /* Sidebar */
+  .sidebar { background:var(--surface); border-right:1px solid var(--border); padding:20px; display:flex; flex-direction:column; gap:16px; }
+  .logo { display:flex; align-items:center; gap:10px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .logo-icon { width:36px; height:36px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+  .logo-text { font-size:13px; font-weight:600; }
+  .logo-sub  { font-size:11px; color:var(--muted); }
+  .slabel { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:5px; }
+  label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  select, input[type=text], input[type=password] { width:100%; padding:8px 12px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; outline:none; transition:border-color .2s; }
+  select:focus, input:focus { border-color:var(--accent); }
+  .key-wrap { position:relative; }
+  .key-wrap input { padding-right:34px; }
+  .eye-btn { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; }
+  .btn-row { display:flex; gap:8px; }
+  .btn-primary { flex:1; padding:10px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none; border-radius:8px; color:#fff; font-size:13px; font-weight:600; cursor:pointer; transition:opacity .2s; }
+  .btn-primary:hover { opacity:.88; }
+  .btn-primary:disabled { opacity:.4; cursor:not-allowed; }
+  .btn-secondary { padding:10px 12px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--muted); font-size:13px; cursor:pointer; transition:all .2s; white-space:nowrap; }
+  .btn-secondary:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-secondary:disabled { opacity:.4; cursor:not-allowed; }
+  .status-line { font-size:11px; color:var(--muted); min-height:15px; text-align:center; }
+  .ticker-row { display:flex; gap:8px; }
+  .ticker-row input { flex:1; font-size:15px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; }
+  .go-btn { padding:8px 14px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none; border-radius:8px; color:#fff; font-size:16px; cursor:pointer; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { padding:4px 10px; background:var(--card); border:1px solid var(--border); border-radius:20px; font-size:11px; font-weight:600; color:var(--muted); cursor:pointer; transition:all .15s; }
+  .chip:hover { border-color:var(--accent); color:var(--accent); }
+  .history { display:flex; flex-direction:column; gap:3px; max-height:160px; overflow-y:auto; }
+  .hist-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-radius:6px; cursor:pointer; transition:background .15s; font-size:12px; }
+  .hist-item:hover { background:var(--card); }
+  .hist-ticker { font-weight:700; }
+  .hverd { font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; }
+  .hverd.BUY   { background:rgba(34,197,94,.15); color:var(--green); }
+  .hverd.HOLD  { background:rgba(245,158,11,.15); color:var(--amber); }
+  .hverd.AVOID { background:rgba(239,68,68,.15);  color:var(--red); }
+
+  /* Version bar */
+  .version-bar { margin-top:auto; padding-top:12px; border-top:1px solid var(--border); }
+  .version-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .version-text { font-size:11px; color:var(--muted); }
+  .version-val  { font-weight:600; color:var(--text); }
+  .update-badge { display:none; font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; background:rgba(79,124,255,.15); color:var(--accent); cursor:pointer; }
+  #appUpdateBtn { display:none; width:100%; }
+
+  /* Main */
+  .main { padding:28px 32px; overflow-y:auto; }
+  .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; height:calc(100vh - 100px); gap:10px; color:var(--muted); text-align:center; }
+  .empty-icon { font-size:48px; opacity:.3; }
+  .empty-state h2 { font-size:18px; color:var(--text); opacity:.5; }
+  .loading-state { display:none; flex-direction:column; align-items:center; justify-content:center; height:calc(100vh - 100px); gap:14px; }
+  .spinner { width:38px; height:38px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .error-banner { display:none; background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); border-radius:8px; padding:10px 14px; color:var(--red); margin-bottom:16px; font-size:13px; }
+  .report { display:none; }
+  .report-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:10px; }
+  .company-name { font-size:22px; font-weight:700; }
+  .company-meta { font-size:13px; color:var(--muted); margin-top:3px; }
+  .verdict-pill { padding:7px 16px; border-radius:20px; font-size:13px; font-weight:700; }
+  .verdict-pill.BUY   { background:rgba(34,197,94,.15); color:var(--green); border:1px solid rgba(34,197,94,.3); }
+  .verdict-pill.HOLD  { background:rgba(245,158,11,.15); color:var(--amber); border:1px solid rgba(245,158,11,.3); }
+  .verdict-pill.AVOID { background:rgba(239,68,68,.15);  color:var(--red);   border:1px solid rgba(239,68,68,.3); }
+  .metrics-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px; }
+  .metric-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:13px; }
+  .metric-label { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:5px; }
+  .metric-value { font-size:21px; font-weight:700; }
+  .metric-sub   { font-size:10px; color:var(--muted); margin-top:2px; }
+  .sg { color:var(--green); } .sf { color:var(--amber); } .sp { color:var(--red); }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+  .card-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:12px; }
+  .kv { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .kv:last-child { border-bottom:none; }
+  .kv-l { color:var(--muted); } .kv-v { font-weight:600; }
+  .moat-src { margin-bottom:12px; }
+  .moat-hdr { display:flex; justify-content:space-between; margin-bottom:4px; font-size:12px; }
+  .bar-bg  { height:5px; background:var(--border); border-radius:3px; }
+  .bar-fill{ height:5px; border-radius:3px; }
+  .moat-desc { font-size:11px; color:var(--muted); margin-top:3px; line-height:1.5; }
+  .chart-wrap { position:relative; height:195px; margin-bottom:12px; }
+  .rev-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .rev-table th { text-align:left; padding:5px 7px; color:var(--muted); font-weight:600; font-size:10px; text-transform:uppercase; border-bottom:1px solid var(--border); }
+  .rev-table td { padding:6px 7px; border-bottom:1px solid var(--border); }
+  .rev-table tr:last-child td { border-bottom:none; }
+  .projected td { color:var(--muted); }
+  .prose { font-size:13px; color:var(--muted); line-height:1.8; }
+  .prose p { margin-bottom:8px; }
+  .full { margin-bottom:12px; }
+  ::-webkit-scrollbar { width:5px; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+  @media(max-width:900px) {
+    .shell { grid-template-columns:1fr; }
+    .metrics-grid { grid-template-columns:repeat(2,1fr); }
+    .two-col { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">📈</div>
+      <div><div class="logo-text">Graham-Buffett Agent</div><div class="logo-sub">Value Investment Research</div></div>
+    </div>
+
+    <div>
+      <div class="slabel">AI Provider</div>
+      <label>Provider</label>
+      <select id="providerSel" onchange="onProviderChange()">
+        <option value="gemini">Google Gemini</option>
+        <option value="anthropic">Anthropic Claude</option>
+        <option value="openai">OpenAI GPT</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Model</label>
+      <select id="modelSel"></select>
+    </div>
+
+    <div>
+      <label>API Key</label>
+      <div class="key-wrap">
+        <input type="password" id="apiKeyInput" placeholder="Paste your API key…" autocomplete="off"/>
+        <button class="eye-btn" onclick="toggleKey()">👁</button>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-primary" onclick="saveSettings()">💾 Save</button>
+      <button class="btn-secondary" id="modelsBtn" onclick="updateModels()">🔄 Update Models</button>
+    </div>
+    <div class="status-line" id="modelsStatus"></div>
+
+    <hr style="border-color:var(--border)">
+
+    <div>
+      <div class="slabel">Analysis</div>
+      <label>Ticker Symbol</label>
+      <div class="ticker-row">
+        <input type="text" id="tickerInput" placeholder="e.g. AAPL" maxlength="10" onkeydown="if(event.key==='Enter')runAnalysis()"/>
+        <button class="go-btn" onclick="runAnalysis()">▶</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="slabel">Quick Picks</div>
+      <div class="chips">
+        <span class="chip" onclick="go('AAPL')">AAPL</span>
+        <span class="chip" onclick="go('ENTG')">ENTG</span>
+        <span class="chip" onclick="go('KTOS')">KTOS</span>
+        <span class="chip" onclick="go('CPRT')">CPRT</span>
+        <span class="chip" onclick="go('ROAD')">ROAD</span>
+        <span class="chip" onclick="go('KO')">KO</span>
+        <span class="chip" onclick="go('MSFT')">MSFT</span>
+        <span class="chip" onclick="go('JNJ')">JNJ</span>
+      </div>
+    </div>
+
+    <div style="flex:1;overflow:hidden">
+      <div class="slabel">Recent</div>
+      <div class="history" id="historyList"></div>
+    </div>
+
+    <!-- Version & GitHub auto-update -->
+    <div class="version-bar">
+      <div class="version-row">
+        <span class="version-text">Version <span class="version-val" id="vLocal">—</span></span>
+        <span class="update-badge" id="vBadge" onclick="appUpdate()">UPDATE AVAILABLE</span>
+      </div>
+      <button class="btn-secondary" id="appUpdateBtn" onclick="appUpdate()">⬆ Update App from GitHub</button>
+      <div class="status-line" id="appUpdateStatus" style="margin-top:4px"></div>
+    </div>
+
+    <!-- Version + App Update -->
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:11px;color:var(--muted)">App version</span>
+        <span id="versionBadge" style="font-size:11px;font-weight:600;color:var(--muted)">v2.1.0</span>
+      </div>
+      <div id="updateAppBanner" style="display:none;background:rgba(79,124,255,0.1);border:1px solid rgba(79,124,255,0.3);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:12px;color:var(--accent)">
+        ⬆ Update available: <span id="updateAppVersion"></span>
+      </div>
+      <button class="update-btn" id="updateAppBtn" onclick="updateApp()" style="width:100%;justify-content:center;display:flex;align-items:center;gap:6px">
+        🔄 Update App from GitHub
+      </button>
+      <div id="updateAppStatus" style="font-size:11px;color:var(--muted);min-height:16px;text-align:center;margin-top:4px"></div>
+    </div>
+    <!-- Version + App Update -->
+    <div class="version-row">
+      <span class="version-badge" id="versionBadge">v2.1.0</span>
+      <span class="update-available" id="updateAvailBadge" onclick="scrollToAppUpdate()">⬆ Update available</span>
+    </div>
+    <button class="app-update-btn" id="appUpdateBtn" onclick="doAppUpdate()">⬆ Install Update & Restart</button>
+    <div id="appUpdateStatus" style="font-size:11px;color:var(--muted);min-height:14px;text-align:center"></div>
+  </aside>
+
+  <main class="main" id="main">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🔍</div>
+      <h2>Enter a ticker to begin</h2>
+      <p style="font-size:12px">Graham-Buffett fundamental analysis for any publicly traded stock</p>
+    </div>
+
+    <div class="loading-state" id="loadingState">
+      <div class="spinner"></div>
+      <div style="color:var(--muted);font-size:14px" id="loadingText">Analysing…</div>
+      <div style="color:var(--muted);font-size:12px" id="loadingStep"></div>
+    </div>
+
+    <div class="error-banner" id="errorBanner"></div>
+
+    <div class="report" id="report">
+      <div class="report-header">
+        <div>
+          <div class="company-name" id="rName"></div>
+          <div class="company-meta" id="rMeta"></div>
+        </div>
+        <div class="verdict-pill" id="rVerdict"></div>
+      </div>
+      <div class="metrics-grid" id="rMetrics"></div>
+      <div class="two-col">
+        <div class="card"><div class="card-title">Intrinsic Value</div><div id="rIV"></div></div>
+        <div class="card"><div class="card-title">Expected Return</div><div id="rRet"></div></div>
+      </div>
+      <div class="full card">
+        <div class="card-title">Economic Moat — <span id="rMoatBadge"></span></div>
+        <div id="rMoat"></div>
+        <div style="margin-top:10px;font-size:12px;color:var(--muted);line-height:1.6" id="rMoatSum"></div>
+      </div>
+      <div class="full card">
+        <div class="card-title">Revenue Forecast</div>
+        <div class="chart-wrap"><canvas id="revChart"></canvas></div>
+        <table class="rev-table" id="rRevTable"></table>
+      </div>
+      <div class="two-col">
+        <div class="card"><div class="card-title">Investment Thesis</div><div class="prose" id="rThesis"></div></div>
+        <div class="card"><div class="card-title">Key Risks</div><div class="prose" id="rRisks"></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+let chartInst = null;
+let hist = JSON.parse(localStorage.getItem('gbHist') || '[]');
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  checkAppVersion();
+  await loadModels();
+  renderHist();
+  try {
+    const cfg = await fetch('/api/config').then(r => r.json());
+    if (cfg.provider) document.getElementById('providerSel').value = cfg.provider;
+    await loadModels();
+    if (cfg.model)  document.getElementById('modelSel').value   = cfg.model;
+    if (cfg.apiKey) document.getElementById('apiKeyInput').value = cfg.apiKey;
+  } catch {}
+  checkAppVersion();
+});
+
+async function onProviderChange() { await loadModels(); }
+
+async function loadModels() {
+  const p   = document.getElementById('providerSel').value;
+  const sel = document.getElementById('modelSel');
+  try {
+    const models = await fetch('/api/models/' + p).then(r => r.json());
+    sel.innerHTML = models.map(m => '<option value="' + m + '">' + m + '</option>').join('');
+  } catch {}
+}
+
+function toggleKey() {
+  const i = document.getElementById('apiKeyInput');
+  i.type = i.type === 'password' ? 'text' : 'password';
+}
+
+function go(t) { document.getElementById('tickerInput').value = t; runAnalysis(); }
+
+async function saveSettings() {
+  await fetch('/api/config', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      provider: document.getElementById('providerSel').value,
+      model:    document.getElementById('modelSel').value,
+      apiKey:   document.getElementById('apiKeyInput').value,
+    })
+  });
+}
+
+// ── Update Models ─────────────────────────────────────────────────────────────
+async function updateModels() {
+  const btn    = document.getElementById('modelsBtn');
+  const status = document.getElementById('modelsStatus');
+  const apiKey = document.getElementById('apiKeyInput').value.trim();
+  const provider = document.getElementById('providerSel').value;
+  if (!apiKey) { status.textContent = '⚠ Enter API key first'; status.style.color='var(--amber)'; setTimeout(()=>status.textContent='',3000); return; }
+  btn.disabled = true; btn.textContent = '⏳ Fetching…';
+  status.style.color = 'var(--muted)'; status.textContent = 'Querying provider APIs…';
+  try {
+    const res  = await fetch('/api/update-models', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({apiKey, provider}) });
+    const json = await res.json();
+    if (json.ok) {
+      const sel = document.getElementById('modelSel');
+      const cur = sel.value;
+      const models = json.models[provider] || [];
+      sel.innerHTML = models.map(m => '<option value="' + m + '">' + m + '</option>').join('');
+      if (models.includes(cur)) sel.value = cur;
+      const total = Object.values(json.models).flat().length;
+      const errs  = Object.keys(json.errors||{}).length;
+      status.textContent = errs === 0 ? '✓ Updated ' + total + ' models' : '⚠ Partial — check API key';
+      status.style.color = errs === 0 ? 'var(--green)' : 'var(--amber)';
+    } else { status.textContent = '✗ Failed'; status.style.color='var(--red)'; }
+  } catch (e) { status.textContent = '✗ ' + e.message; status.style.color='var(--red)'; }
+  finally { btn.disabled=false; btn.textContent='🔄 Update Models'; setTimeout(()=>status.textContent='',6000); }
+}
+
+// ── App version & GitHub auto-update ─────────────────────────────────────────
+async function checkAppVersion() {
+  try {
+    const v = await fetch('/api/app-version').then(r => r.json());
+    document.getElementById('vLocal').textContent = 'v' + v.local;
+    if (v.updateAvailable) {
+      document.getElementById('vBadge').style.display = 'inline-block';
+      document.getElementById('appUpdateBtn').style.display = 'block';
+      document.getElementById('appUpdateBtn').textContent = v.useCommits
+        ? '\u2B06 Update to latest commit (' + v.remote + ')'
+        : '\u2B06 Update to v' + v.remote;
+    }
+    if (v.error && !v.updateAvailable) {
+      document.getElementById('appUpdateStatus').textContent = v.error;
+    }
+  } catch(e) {
+    document.getElementById('appUpdateStatus').textContent = 'Cannot reach GitHub';
+  }
+}
+
+async function appUpdate() {
+  const btn    = document.getElementById('appUpdateBtn');
+  const status = document.getElementById('appUpdateStatus');
+  btn.disabled = true; btn.textContent = '\u23F3 Pulling from GitHub\u2026';
+  status.style.color = 'var(--muted)'; status.textContent = 'Downloading and installing updates\u2026';
+  try {
+    const res  = await fetch('/api/app-update', { method:'POST' });
+    const json = await res.json();
+    if (json.ok) {
+      status.style.color = 'var(--green)';
+      status.textContent = '\u2713 Updated! Restarting in 3s\u2026';
+      setTimeout(() => location.reload(), 3500);
+    } else {
+      status.style.color = 'var(--red)'; status.textContent = '\u2717 ' + json.error;
+      btn.disabled = false; btn.textContent = '\u2B06 Update App from GitHub';
+    }
+  } catch(e) {
+    status.style.color = 'var(--red)'; status.textContent = '\u2717 ' + e.message;
+    btn.disabled = false; btn.textContent = '\u2B06 Update App from GitHub';
+  }
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+function addHist(d) {
+  hist = [{ticker:d.ticker, verdict:d.verdict, name:d.companyName}, ...hist.filter(h=>h.ticker!==d.ticker)].slice(0,20);
+  localStorage.setItem('gbHist', JSON.stringify(hist));
+  renderHist();
+}
+function renderHist() {
+  const el = document.getElementById('historyList');
+  if (!hist.length) { el.innerHTML='<div style="font-size:11px;color:var(--muted)">No recent analyses</div>'; return; }
+  el.innerHTML = hist.map(h =>
+    '<div class="hist-item" onclick="go(\'' + h.ticker + '\')">' +
+    '<div><div class="hist-ticker">' + h.ticker + '</div><div style="font-size:10px;color:var(--muted)">' + h.name.slice(0,26) + '</div></div>' +
+    '<div class="hverd ' + h.verdict + '">' + h.verdict + '</div></div>'
+  ).join('');
+}
+
+// ── Analysis ──────────────────────────────────────────────────────────────────
+const STEPS = ['Fetching financial statements…','Calculating intrinsic value…','Assessing competitive moat…','Building revenue model…','Running margin of safety analysis…'];
+
+async function runAnalysis() {
+  const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
+  if (!ticker) return;
+  const apiKey   = document.getElementById('apiKeyInput').value.trim();
+  const provider = document.getElementById('providerSel').value;
+  const model    = document.getElementById('modelSel').value;
+  if (!apiKey) { showErr('Please enter your API key in the sidebar.'); return; }
+
+  document.getElementById('emptyState').style.display   = 'none';
+  document.getElementById('report').style.display       = 'none';
+  document.getElementById('errorBanner').style.display  = 'none';
+  document.getElementById('loadingState').style.display = 'flex';
+  document.getElementById('loadingText').textContent     = 'Analysing ' + ticker + '…';
+  document.getElementById('loadingStep').textContent     = STEPS[0];
+  let si=0; const st = setInterval(()=>{ document.getElementById('loadingStep').textContent=STEPS[++si%STEPS.length]; }, 2200);
+
+  try {
+    const res  = await fetch('/api/analyse', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ticker, provider, model, apiKey}) });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Analysis failed');
+    clearInterval(st);
+    addHist(json.data);
+    renderReport(json.data);
+  } catch(err) { clearInterval(st); showErr(err.message); }
+}
+
+function showErr(msg) {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('emptyState').style.display   = 'flex';
+  const b = document.getElementById('errorBanner');
+  b.textContent = '⚠ ' + msg; b.style.display = 'block';
+  setTimeout(()=>b.style.display='none', 8000);
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function sc(s) { return s==='good'?'sg':s==='poor'?'sp':'sf'; }
+function mc(r) { return r==='Strong'?'#22c55e':r==='Moderate'?'#f59e0b':r==='Narrow'?'#f97316':'#ef4444'; }
+
+function renderReport(d) {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('emptyState').style.display   = 'none';
+  document.getElementById('errorBanner').style.display  = 'none';
+
+  document.getElementById('rName').textContent = d.companyName + ' (' + d.ticker + ')';
+  document.getElementById('rMeta').textContent = d.sector + '  ·  ' + d.marketCap + '  ·  ' + d.currency;
+  const vp = document.getElementById('rVerdict');
+  vp.textContent = d.verdict + ' — ' + d.verdictReason; vp.className = 'verdict-pill ' + d.verdict;
+
+  const m = d.metrics;
+  document.getElementById('rMetrics').innerHTML = [
+    {l:'P/E Ratio',      v:m.peRatio>0?m.peRatio.toFixed(1)+'x':'N/A',     s:m.peStatus,     sub:'Price-to-earnings'},
+    {l:'P/B Ratio',      v:m.pbRatio>0?m.pbRatio.toFixed(1)+'x':'N/A',     s:m.pbStatus,     sub:'Price-to-book'},
+    {l:'ROE',            v:Number(m.roe).toFixed(1)+'%',                    s:m.roeStatus,    sub:'Return on equity'},
+    {l:'Debt/Equity',    v:Number(m.debtToEquity).toFixed(2)+'x',           s:m.debtStatus,   sub:'Leverage'},
+    {l:'Gross Margin',   v:Number(m.grossMargin).toFixed(1)+'%',            s:m.marginStatus, sub:'Profitability'},
+    {l:'Current Ratio',  v:Number(m.currentRatio).toFixed(1)+'x',           s:m.currentStatus,sub:'Liquidity'},
+    {l:'Dividend Yield', v:Number(m.dividendYield).toFixed(2)+'%',          s:'',             sub:'Annual yield'},
+    {l:'Price',          v:'$'+Number(d.currentPrice).toFixed(2),           s:'',             sub:'Current market price'},
+  ].map(x=>'<div class="metric-card"><div class="metric-label">'+x.l+'</div><div class="metric-value '+(x.s?sc(x.s):'')+'">'+x.v+'</div><div class="metric-sub">'+x.sub+'</div></div>').join('');
+
+  const iv=d.intrinsicValue, mos=Number(iv.marginOfSafety);
+  const mosC=mos>=25?'var(--green)':mos>=0?'var(--amber)':'var(--red)';
+  document.getElementById('rIV').innerHTML = [
+    ['Graham Number','$'+Number(iv.grahamNumber).toFixed(2)],
+    ['DCF Value','$'+Number(iv.dcfValue).toFixed(2)],
+    ['Earnings Power Value','$'+Number(iv.earningsPowerValue).toFixed(2)],
+    ['Book Value/Share','$'+Number(iv.bookValue).toFixed(2)],
+    ['Consensus Intrinsic','<strong>$'+Number(iv.consensusIntrinsic).toFixed(2)+'</strong>'],
+    ['Margin of Safety','<span style="color:'+mosC+';font-weight:700">'+mos.toFixed(1)+'%</span>'],
+  ].map(([l,v])=>'<div class="kv"><span class="kv-l">'+l+'</span><span class="kv-v">'+v+'</span></div>').join('')
+   +'<div style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.5">'+iv.notes+'</div>';
+
+  const ret=d.expectedReturn;
+  const retC=ret.returnAssessment==='Attractive'?'var(--green)':ret.returnAssessment==='Adequate'?'var(--amber)':'var(--red)';
+  document.getElementById('rRet').innerHTML = [
+    ['Earnings Yield',Number(ret.earningsYield).toFixed(1)+'%'],
+    ['Dividend Yield',Number(ret.dividendYield).toFixed(2)+'%'],
+    ['Expected EPS Growth',Number(ret.expectedEpsGrowth).toFixed(1)+'%/yr'],
+    ['Total Expected Return','<strong>'+Number(ret.totalExpectedReturn).toFixed(1)+'%/yr</strong>'],
+    ['Risk-Free Rate',Number(ret.riskFreeRate).toFixed(1)+'%'],
+    ['Excess Return',Number(ret.excessReturn).toFixed(1)+'%'],
+    ['Time Horizon',ret.timeHorizon],
+    ['Assessment','<span style="color:'+retC+';font-weight:700">'+ret.returnAssessment+'</span>'],
+  ].map(([l,v])=>'<div class="kv"><span class="kv-l">'+l+'</span><span class="kv-v">'+v+'</span></div>').join('');
+
+  const moat=d.moat, moatC=mc(moat.overallRating);
+  document.getElementById('rMoatBadge').innerHTML='<span style="color:'+moatC+';font-weight:700">'+moat.overallRating+' ('+moat.overallScore+'/100)</span> &nbsp;·&nbsp; <span style="color:var(--muted)">'+moat.durability+'</span>';
+  document.getElementById('rMoat').innerHTML=moat.sources.map(s=>'<div class="moat-src"><div class="moat-hdr"><span style="font-weight:600">'+s.name+'</span><span style="color:var(--muted)">'+s.score+'/100</span></div><div class="bar-bg"><div class="bar-fill" style="width:'+s.score+'%;background:'+moatC+'"></div></div><div class="moat-desc">'+s.description+'</div></div>').join('');
+  document.getElementById('rMoatSum').textContent=moat.moatSummary;
+
+  const fc=d.revenueForecasts;
+  if(chartInst) chartInst.destroy();
+  chartInst=new Chart(document.getElementById('revChart'),{
+    type:'bar',
+    data:{labels:fc.map(r=>r.year),datasets:[{data:fc.map(r=>Number(r.revenue)),backgroundColor:fc.map(r=>r.type==='actual'?'#4f7cff':'rgba(79,124,255,.35)'),borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' $'+ctx.parsed.y.toFixed(2)+'B'}}},scales:{y:{ticks:{color:'#8b90a8',callback:v=>'$'+v+'B',font:{size:11}},grid:{color:'rgba(255,255,255,.05)'}},x:{ticks:{color:'#8b90a8',font:{size:11}},grid:{display:false}}}}
+  });
+
+  document.getElementById('rRevTable').innerHTML='<thead><tr><th>Year</th><th>Revenue</th><th>Growth</th><th>Type</th><th>Justification</th></tr></thead><tbody>'+
+    fc.map(r=>'<tr class="'+(r.type==='projected'?'projected':'')+'"><td>'+r.year+'</td><td>$'+Number(r.revenue).toFixed(2)+'B</td><td>'+(r.growth!=null?(r.growth>=0?'+':'')+Number(r.growth).toFixed(1)+'%':'—')+'</td><td>'+r.type+'</td><td style="font-size:11px;color:var(--muted)">'+r.justification+'</td></tr>').join('')+'</tbody>';
+
+  document.getElementById('rThesis').innerHTML=(d.thesis||'').split('\n').filter(Boolean).map(p=>'<p>'+p+'</p>').join('');
+  document.getElementById('rRisks').innerHTML=(d.risks||'').split('\n').filter(Boolean).map(p=>'<p>'+p+'</p>').join('');
+
+  document.getElementById('report').style.display='block';
+  document.getElementById('main').scrollTop=0;
+}
+// ── App version + GitHub update ───────────────────────────────────────────────
+async function checkAppVersion() {
+  try {
+    const v = await fetch('/api/app-version').then(r => r.json());
+    document.getElementById('versionBadge').textContent = 'v' + v.local;
+    if (v.updateAvailable) {
+      document.getElementById('updateAppVersion').textContent = 'v' + v.remote;
+      document.getElementById('updateAppBanner').style.display = 'block';
+    }
+    if (!v.gitOk) {
+      document.getElementById('updateAppBtn').title = 'Git not set up — see GitHub setup guide';
+    }
+  } catch {}
+}
+
+async function updateApp() {
+  const btn    = document.getElementById('updateAppBtn');
+  const status = document.getElementById('updateAppStatus');
+
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Updating…';
+  status.style.color = 'var(--muted)';
+  status.textContent = 'Pulling latest from GitHub…';
+
+  try {
+    const res  = await fetch('/api/app-update', { method: 'POST' });
+    const json = await res.json();
+
+    if (json.ok) {
+      status.style.color = 'var(--green)';
+      status.textContent = '✓ Updated! Restarting in 3s…';
+      document.getElementById('updateAppBanner').style.display = 'none';
+      setTimeout(() => location.reload(), 3500);
+    } else {
+      status.style.color = 'var(--red)';
+      status.textContent = '✗ ' + json.error;
+      btn.disabled = false;
+      btn.innerHTML = '🔄 Update App from GitHub';
+    }
+  } catch (e) {
+    status.style.color = 'var(--red)';
+    status.textContent = '✗ ' + e.message;
+    btn.disabled = false;
+    btn.innerHTML = '🔄 Update App from GitHub';
+  }
+}
+// ── App version check ─────────────────────────────────────────────────────────
+async function checkAppVersion() {
+  try {
+    const res  = await fetch('/api/app-version');
+    const info = await res.json();
+
+    // Update version badge
+    const badge = document.getElementById('versionBadge');
+    if (badge && info.local) badge.textContent = 'v' + info.local;
+
+    if (info.updateAvailable) {
+      // Show pulsing badge and install button
+      const avail = document.getElementById('updateAvailBadge');
+      const btn   = document.getElementById('appUpdateBtn');
+      if (avail) avail.style.display = 'inline-flex';
+      if (btn)   btn.style.display = 'block';
+      if (btn && info.remote) btn.textContent = `⬆ Install v${info.remote} & Restart`;
+
+      // Also show a banner in main area
+      const banner = document.getElementById('errorBanner');
+      if (banner) {
+        banner.style.background = 'rgba(79,124,255,0.1)';
+        banner.style.borderColor = 'rgba(79,124,255,0.3)';
+        banner.style.color = 'var(--accent)';
+        banner.textContent = `⬆ App update available (v${info.remote}) — click "Install Update & Restart" in the sidebar`;
+        banner.style.display = 'block';
+      }
+    }
+
+    if (info.error && !info.updateAvailable) {
+      console.log('Version check:', info.error);
+    }
+  } catch (e) {
+    console.log('Version check failed:', e.message);
+  }
+}
+
+function scrollToAppUpdate() {
+  document.getElementById('appUpdateBtn')?.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function doAppUpdate() {
+  const btn    = document.getElementById('appUpdateBtn');
+  const status = document.getElementById('appUpdateStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ Pulling from GitHub…';
+  status.textContent = 'Running git pull + npm install…';
+  status.style.color = 'var(--muted)';
+
+  try {
+    const res  = await fetch('/api/app-update', { method: 'POST' });
+    const json = await res.json();
+
+    if (json.ok) {
+      btn.textContent = '✓ Updated! Restarting…';
+      status.textContent = 'Server is restarting — refresh in 5 seconds';
+      status.style.color = 'var(--green)';
+      setTimeout(() => location.reload(), 5000);
+    } else {
+      throw new Error(json.error);
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '⬆ Install Update & Restart';
+    status.textContent = '✗ ' + e.message;
+    status.style.color = 'var(--red)';
+  }
+}
+
+// Run version check on load (after config loads)
+setTimeout(checkAppVersion, 1500);
+
+
+</script>
+</body>
+</html>

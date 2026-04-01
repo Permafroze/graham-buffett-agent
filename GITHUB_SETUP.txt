@@ -1,0 +1,124 @@
+# Setting Up GitHub for Auto-Updates
+
+Follow these steps once. After that, every update you push to GitHub
+will be installable from inside the app with one click.
+
+---
+
+## Step 1 — Install Git
+
+Download from https://git-scm.com/download/win and install with all defaults.
+
+Verify it worked — open Command Prompt and run:
+  git --version
+
+---
+
+## Step 2 — Create a GitHub account
+
+Go to https://github.com and sign up if you don't have an account.
+
+---
+
+## Step 3 — Create a new repository on GitHub
+
+1. Click the "+" icon in the top-right corner → "New repository"
+2. Name it: graham-buffett-agent
+3. Set it to Public or Private (your choice)
+4. Do NOT check "Add a README" or any other options
+5. Click "Create repository"
+6. Copy the repository URL shown — it looks like:
+   https://github.com/YOUR_USERNAME/graham-buffett-agent.git
+
+---
+
+## Step 4 — Edit package.json
+
+Open package.json in Notepad and replace YOUR_USERNAME with your actual
+GitHub username in this line:
+
+  "url": "https://github.com/YOUR_USERNAME/graham-buffett-agent"
+
+Save the file.
+
+---
+
+## Step 5 — Push the app to GitHub
+
+Open Command Prompt, navigate to the app folder:
+
+  cd C:\Users\mattc\Downloads\graham-buffett-gui\gbagent-gui
+
+Run these commands one at a time:
+
+  git init
+  git add .
+  git commit -m "Initial release v2.1.0"
+  git branch -M main
+  git remote add origin https://github.com/YOUR_USERNAME/graham-buffett-agent.git
+  git push -u origin main
+
+When prompted, enter your GitHub username and password.
+(If it asks for a token instead of password, see Step 5b below.)
+
+---
+
+## Step 5b — GitHub token (if password doesn't work)
+
+GitHub no longer accepts passwords for git push. Create a token:
+
+1. Go to https://github.com/settings/tokens
+2. Click "Generate new token (classic)"
+3. Give it a name, set expiry to "No expiration"
+4. Check the "repo" checkbox
+5. Click "Generate token"
+6. Copy the token — use it as your password when git asks
+
+---
+
+## Step 6 — Tag a release (so the app can detect updates)
+
+  git tag v2.1.0
+  git push origin v2.1.0
+
+Now go to GitHub → your repo → "Releases" → "Create a release"
+Select the v2.1.0 tag and click "Publish release".
+
+The app will now show "Update available" whenever you publish a new release.
+
+---
+
+## How to push future updates
+
+Whenever you make changes to the app (or I send you a new version):
+
+1. Copy the new files into the app folder (replacing old ones)
+2. Open Command Prompt in the app folder
+3. Run:
+
+  git add .
+  git commit -m "Update vX.X.X"
+  git push
+
+4. Tag a new release:
+
+  git tag vX.X.X
+  git push origin vX.X.X
+
+5. Publish the release on GitHub
+
+Users of the app will then see the "Update available" banner and can
+click "Update App from GitHub" to pull it in one click.
+
+---
+
+## How the auto-update works (for reference)
+
+When the app starts:
+  1. It checks /api/app-version which calls the GitHub Releases API
+  2. If a newer version tag exists, the yellow "Update available" banner appears
+  3. Clicking "Update App from GitHub" runs: git pull origin main + npm install
+  4. The server restarts automatically and the browser refreshes
+
+Your API key and settings are stored in config.json which is in .gitignore
+so they are never pushed to GitHub.
