@@ -1,6 +1,6 @@
 {
   "name": "graham-buffett-agent-gui",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Graham-Buffett Investment Research Agent — Desktop GUI",
   "type": "module",
   "main": "src/server.js",
